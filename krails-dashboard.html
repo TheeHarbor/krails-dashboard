@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRails — Payment Infrastructure</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --bg-2: #111111;
+    --bg-3: #1a1a1a;
+    --bg-4: #222222;
+    --border: rgba(255,255,255,0.08);
+    --border-2: rgba(255,255,255,0.14);
+    --text: #f0f0f0;
+    --text-2: #888;
+    --text-3: #555;
+    --green: #1D9E75;
+    --green-light: #5DCAA5;
+    --green-bg: rgba(29,158,117,0.12);
+    --green-bg-2: rgba(29,158,117,0.2);
+    --amber: #EF9F27;
+    --amber-bg: rgba(239,159,39,0.12);
+    --red: #E24B4A;
+    --red-bg: rgba(226,75,74,0.12);
+    --blue: #378ADD;
+    --blue-bg: rgba(55,138,221,0.1);
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Layout ── */
+  .app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    background: var(--text);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-mark svg { width: 20px; height: 20px; }
+
+  .logo-text {}
+  .logo-name { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  .logo-tagline { font-size: 11px; color: var(--text-2); letter-spacing: 0.5px; text-transform: uppercase; margin-top: 1px; }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .net-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--text-2);
+    border: 0.5px solid var(--border-2);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .sim-btn {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 18px;
+    border-radius: 8px;
+    border: 0.5px solid var(--border-2);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    color: var(--text);
+  }
+
+  .sim-btn:hover { background: var(--bg-3); }
+  .sim-btn.running {
+    background: var(--green-bg-2);
+    border-color: var(--green);
+    color: var(--green-light);
+  }
+
+  /* ── Metrics row ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .metric {
+    background: var(--bg-2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-2);
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    transition: color 0.3s;
+  }
+
+  .metric-value.flash { color: var(--green-light); }
+
+  .metric-sub {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .metric-sub.green { color: var(--green); }
+
+  /* ── Pipeline ── */
+  .pipeline-wrap { margin-bottom: 1.5rem; }
+
+  .section-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .stage {
+    background: var(--bg-2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stage::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: transparent;
+    transition: background 0.3s;
+  }
+
+  .stage.active { border-color: var(--green); background: var(--green-bg); }
+  .stage.active::after { background: var(--green); }
+  .stage.has-items { border-color: var(--border-2); }
+
+  .stage-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .stage-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--bg-4);
+    transition: background 0.3s;
+  }
+
+  .stage.active .stage-dot { background: var(--green); animation: pulse 1.5s infinite; }
+  .stage.has-items .stage-dot { background: var(--text-3); }
+
+  .stage-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+    transition: color 0.3s;
+  }
+
+  .stage.active .stage-name { color: var(--green-light); }
+  .stage.has-items .stage-name { color: var(--text); }
+
+  .stage-count {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    color: var(--text-3);
+    font-family: 'IBM Plex Mono', monospace;
+    transition: color 0.3s;
+  }
+
+  .stage.active .stage-count { color: var(--green-light); }
+  .stage.has-items .stage-count { color: var(--text); }
+
+  .stage-timing {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── Throughput chart ── */
+  .chart-wrap {
+    background: var(--bg-2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 1.5rem;
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+
+  .chart-title { font-size: 12px; color: var(--text-2); letter-spacing: 0.4px; text-transform: uppercase; }
+
+  .chart-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text-2);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .chart-legend span::before {
+    content: '—';
+    margin-right: 4px;
+  }
+
+  .chart-legend .l-settled::before { color: var(--green); }
+  .chart-legend .l-failed::before { color: var(--red); }
+
+  canvas#throughput {
+    width: 100%;
+    height: 80px;
+    display: block;
+  }
+
+  /* ── Feed ── */
+  .feed-wrap { }
+
+  .feed {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .tx-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto 90px;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 16px;
+    border-bottom: 0.5px solid var(--border);
+    transition: background 0.15s;
+    animation: slide-in 0.3s ease;
+  }
+
+  .tx-row:last-child { border-bottom: none; }
+  .tx-row:hover { background: var(--bg-2); }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .tx-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .tx-icon.settled   { background: var(--green-bg-2); color: var(--green-light); }
+  .tx-icon.verifying { background: var(--amber-bg); color: var(--amber); }
+  .tx-icon.clearing  { background: var(--blue-bg); color: var(--blue); }
+  .tx-icon.initiated { background: var(--bg-4); color: var(--text-3); }
+  .tx-icon.failed    { background: var(--red-bg); color: var(--red); }
+
+  .tx-main { min-width: 0; }
+
+  .tx-parties {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tx-meta {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 1px;
+  }
+
+  .tx-badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .tx-badge.settled   { background: var(--green-bg-2); color: var(--green-light); }
+  .tx-badge.verifying { background: var(--amber-bg); color: var(--amber); }
+  .tx-badge.clearing  { background: var(--blue-bg); color: var(--blue); }
+  .tx-badge.initiated { background: var(--bg-4); color: var(--text-3); border: 0.5px solid var(--border); }
+  .tx-badge.failed    { background: var(--red-bg); color: var(--red); }
+
+  .tx-amount {
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text);
+    text-align: right;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .footer-right { display: flex; gap: 20px; }
+
+  .send-btn {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 20px;
+    background: var(--green-bg-2);
+    border: 0.5px solid var(--green);
+    color: var(--green-light);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .send-btn:hover { background: rgba(29,158,117,0.3); }
+  .send-btn:active { transform: scale(0.97); }
+
+  @media (max-width: 640px) {
+    .metrics { grid-template-columns: repeat(2,1fr); }
+    .pipeline { grid-template-columns: repeat(2,1fr); }
+    .tx-row { grid-template-columns: 28px 1fr auto; }
+    .tx-amount { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="7" height="7" rx="1.5" fill="#0a0a0a" opacity="0.9"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5" fill="#0a0a0a" opacity="0.6"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5" fill="#0a0a0a" opacity="0.6"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5" fill="#0a0a0a" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <div class="logo-name">KRails</div>
+        <div class="logo-tagline">Blockchain Payment Infrastructure</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="net-badge">
+        <div class="pulse-dot"></div>
+        Mainnet · B2B Rail
+      </div>
+      <button class="sim-btn" id="sim-toggle" onclick="toggleSim()">▶ Run simulation</button>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Settled today</div>
+      <div class="metric-value" id="m-settled">0</div>
+      <div class="metric-sub green" id="m-vol">$0 volume</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Avg settlement</div>
+      <div class="metric-value" id="m-time">—</div>
+      <div class="metric-sub">vs 3.2 days traditional</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Success rate</div>
+      <div class="metric-value" id="m-rate">—</div>
+      <div class="metric-sub">SLA threshold 99.5%</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Active corridors</div>
+      <div class="metric-value" id="m-corridors">4</div>
+      <div class="metric-sub">USD · MXN · BRL · CAD</div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="pipeline-wrap">
+    <div class="section-row">
+      <div class="section-label">Live pipeline</div>
+    </div>
+    <div class="pipeline">
+      <div class="stage" id="st-initiated">
+        <div class="stage-indicator">
+          <div class="stage-dot"></div>
+          <div class="stage-name">Initiated</div>
+        </div>
+        <div class="stage-count" id="c-initiated">0</div>
+        <div class="stage-timing">0ms · instant</div>
+      </div>
+      <div class="stage" id="st-verifying">
+        <div class="stage-indicator">
+          <div class="stage-dot"></div>
+          <div class="stage-name">Verifying</div>
+        </div>
+        <div class="stage-count" id="c-verifying">0</div>
+        <div class="stage-timing">~2s · chain validation</div>
+      </div>
+      <div class="stage" id="st-clearing">
+        <div class="stage-indicator">
+          <div class="stage-dot"></div>
+          <div class="stage-name">Clearing</div>
+        </div>
+        <div class="stage-count" id="c-clearing">0</div>
+        <div class="stage-timing">~4s · multi-currency</div>
+      </div>
+      <div class="stage" id="st-settled">
+        <div class="stage-indicator">
+          <div class="stage-dot"></div>
+          <div class="stage-name">Settled</div>
+        </div>
+        <div class="stage-count" id="c-settled">0</div>
+        <div class="stage-timing">near-instant final</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Throughput chart -->
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <div class="chart-title">Throughput · last 30 ticks</div>
+      <div class="chart-legend">
+        <span class="l-settled">settled</span>
+        <span class="l-failed">failed</span>
+      </div>
+    </div>
+    <canvas id="throughput"></canvas>
+  </div>
+
+  <!-- Feed -->
+  <div class="feed-wrap">
+    <div class="section-row">
+      <div class="section-label">Transaction feed</div>
+      <button class="send-btn" onclick="sendOne()">+ Send payment</button>
+    </div>
+    <div class="feed" id="feed">
+      <div class="tx-row" style="justify-content:center; color: var(--text-3); font-size:13px; display:flex; padding: 2rem;">
+        Press "Run simulation" or send a payment to begin
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span id="block-num">Block #—</span>
+    <div class="footer-right">
+      <span id="tps-label">— tx/min</span>
+      <span id="clock">—</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────
+const BUYERS  = ['Apex Distributors','Mara Logistics','Vega Foods SA','Brio Industrial','Crux Supply Co','Delta Parts Inc','Helios Group','Summit Imports','Clave Mayoristas','Titan Wholesale'];
+const SELLERS = ['Nexus Wholesale','Prime Fulfillment','Atlas Goods','Crest Manufacturing','Orbit Supplies Ltd','Meridian & Co','Lacuna Exports','Solaris Parts','Beacon Logistics','Ferro Supply'];
+const CURRENCIES = ['USD','MXN','BRL','CAD'];
+const ICONS = { settled:'✓', verifying:'◈', clearing:'⊙', initiated:'○', failed:'✕' };
+
+let txs = [];
+let settled = 0, vol = 0, success = 0, total = 0;
+let blockH = 4829301;
+let simRunning = false;
+let simInterval = null;
+let burstTimeout = null;
+let txPerMin = 0;
+let txMinCount = 0;
+
+// Throughput history: array of {s: settled_count, f: failed_count}
+let throughput = Array(30).fill(null).map(() => ({s:0,f:0}));
+let throughputTick = 0;
+
+// ── Utilities ──────────────────────────────────────────
+function rInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function pick(a){ return a[rInt(0,a.length-1)]; }
+function txId(){ return 'KR-'+Math.random().toString(36).substr(2,8).toUpperCase(); }
+function fmt(n){ return n>=1000000 ? (n/1000000).toFixed(1)+'M' : n>=1000 ? (n/1000).toFixed(0)+'K' : n; }
+
+// ── Core TX flow ────────────────────────────────────────
+function createTx(){
+  const tx = {
+    id: txId(),
+    buyer: pick(BUYERS),
+    seller: pick(SELLERS),
+    currency: pick(CURRENCIES),
+    amount: rInt(6000,220000),
+    status: 'initiated',
+    ts: Date.now(),
+  };
+  txs.unshift(tx);
+  total++;
+  txMinCount++;
+  blockH++;
+
+  renderAll();
+
+  const v2 = rInt(1400,2400);
+  const v3 = rInt(3500,5500);
+  const v4 = rInt(6500,9500);
+
+  setTimeout(()=>{ tx.status='verifying'; renderAll(); }, v2);
+  setTimeout(()=>{ tx.status='clearing';  renderAll(); }, v3);
+  setTimeout(()=>{
+    const fail = Math.random() < 0.035;
+    tx.status = fail ? 'failed' : 'settled';
+    if(!fail){ settled++; success++; vol+=tx.amount; flashMetric('m-settled'); }
+    throughput[throughputTick % 30][fail?'f':'s']++;
+    renderAll();
+    drawChart();
+  }, v4);
+
+  return tx;
+}
+
+function sendOne(){ createTx(); }
+
+// ── Simulation ──────────────────────────────────────────
+function toggleSim(){
+  simRunning = !simRunning;
+  const btn = document.getElementById('sim-toggle');
+  if(simRunning){
+    btn.textContent = '■ Stop simulation';
+    btn.classList.add('running');
+    runSimLoop();
+  } else {
+    btn.textContent = '▶ Run simulation';
+    btn.classList.remove('running');
+    if(simInterval){ clearInterval(simInterval); simInterval=null; }
+    if(burstTimeout){ clearTimeout(burstTimeout); burstTimeout=null; }
+  }
+}
+
+function runSimLoop(){
+  // Initial burst
+  for(let i=0;i<4;i++) setTimeout(()=>createTx(), i*300);
+
+  // Ongoing: random cadence 1.5–4s
+  function scheduleNext(){
+    if(!simRunning) return;
+    const delay = rInt(800,3200);
+    simInterval = setTimeout(()=>{
+      if(!simRunning) return;
+      // occasional burst of 2-3
+      const burst = Math.random()<0.2 ? rInt(2,3) : 1;
+      for(let i=0;i<burst;i++) setTimeout(()=>{ if(simRunning) createTx(); }, i*200);
+      scheduleNext();
+    }, delay);
+  }
+  scheduleNext();
+
+  // Throughput tick every 5s
+  setInterval(()=>{
+    if(!simRunning) return;
+    throughputTick++;
+    if(throughputTick < 30){
+      throughput[throughputTick] = {s:0,f:0};
+    } else {
+      throughput.shift();
+      throughput.push({s:0,f:0});
+    }
+    drawChart();
+  }, 5000);
+}
+
+// ── Render ──────────────────────────────────────────────
+function countStatus(s){ return txs.filter(t=>t.status===s).length; }
+
+function renderAll(){
+  renderPipeline();
+  renderMetrics();
+  renderFeed();
+  renderFooter();
+}
+
+function renderPipeline(){
+  const counts = { initiated:0, verifying:0, clearing:0, settled:0, failed:0 };
+  txs.forEach(t=>{ if(counts[t.status]!==undefined) counts[t.status]++; });
+
+  ['initiated','verifying','clearing','settled'].forEach(s=>{
+    const n = counts[s];
+    const el = document.getElementById('st-'+s);
+    const cnt = document.getElementById('c-'+s);
+    cnt.textContent = n;
+    el.className = 'stage' + (n>0 ? (s==='settled'||s==='initiated' ? ' has-items' : ' active') : '');
+    if(s==='initiated' && n>0) el.className='stage active';
+    if(s==='settled' && n>0) el.className='stage has-items';
+  });
+}
+
+function flashMetric(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.add('flash');
+  setTimeout(()=>el.classList.remove('flash'), 600);
+}
+
+function renderMetrics(){
+  document.getElementById('m-settled').textContent = settled;
+  document.getElementById('m-vol').textContent = '$'+vol.toLocaleString()+' volume';
+  document.getElementById('m-time').textContent = settled>0 ? rInt(7,13)+'s' : '—';
+  document.getElementById('m-rate').textContent = total>0 ? Math.round((success/total)*100)+'%' : '—';
+}
+
+function renderFeed(){
+  const feed = document.getElementById('feed');
+  const visible = txs.slice(0,12);
+  if(visible.length===0) return;
+
+  feed.innerHTML = visible.map(t=>{
+    const age = Math.round((Date.now()-t.ts)/1000);
+    const ageStr = age<60 ? age+'s ago' : Math.round(age/60)+'m ago';
+    return `<div class="tx-row">
+      <div class="tx-icon ${t.status}">${ICONS[t.status]||'○'}</div>
+      <div class="tx-main">
+        <div class="tx-parties">${t.buyer} → ${t.seller}</div>
+        <div class="tx-meta">${t.id} · ${ageStr}</div>
+      </div>
+      <div class="tx-badge ${t.status}">${t.status}</div>
+      <div class="tx-amount">${t.currency} ${t.amount.toLocaleString()}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderFooter(){
+  document.getElementById('block-num').textContent = 'Block #'+blockH.toLocaleString();
+}
+
+// ── Chart ───────────────────────────────────────────────
+function drawChart(){
+  const canvas = document.getElementById('throughput');
+  const dpr = window.devicePixelRatio||1;
+  const W = canvas.offsetWidth;
+  const H = 80;
+  canvas.width = W*dpr;
+  canvas.height = H*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  const data = throughput;
+  const n = data.length;
+  const maxS = Math.max(1, ...data.map(d=>d.s));
+  const colW = W/n;
+
+  ctx.clearRect(0,0,W,H);
+
+  // settled bars
+  data.forEach((d,i)=>{
+    if(d.s===0) return;
+    const bH = Math.max(2, (d.s/maxS)*(H-16));
+    const x = i*colW;
+    const y = H - bH;
+    ctx.fillStyle = 'rgba(29,158,117,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(x+2, y, colW-4, bH, 2);
+    ctx.fill();
+  });
+
+  // failed dots
+  data.forEach((d,i)=>{
+    if(d.f===0) return;
+    const x = i*colW + colW/2;
+    ctx.fillStyle = '#E24B4A';
+    ctx.beginPath();
+    ctx.arc(x, H-8, 3, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // baseline
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0,H); ctx.lineTo(W,H);
+  ctx.stroke();
+}
+
+// ── Clock + TPS ─────────────────────────────────────────
+setInterval(()=>{
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+setInterval(()=>{
+  const rate = simRunning ? txMinCount : 0;
+  document.getElementById('tps-label').textContent = rate+' tx/min';
+  txMinCount = 0;
+}, 60000);
+
+// Init chart
+window.addEventListener('resize', drawChart);
+setTimeout(drawChart, 100);
+</script>
+</body>
+</html>
